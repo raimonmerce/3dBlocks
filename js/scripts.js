@@ -79,15 +79,12 @@ function main() {
     }
 
     function render() {
-
         if (resizeRendererToDisplaySize(renderer)) {
             const canvas = renderer.domElement;
             camera.aspect = canvas.clientWidth / canvas.clientHeight;
             camera.updateProjectionMatrix();
         }
-
         renderer.render(scene, camera);
-
         requestAnimationFrame(render);
     }
 
@@ -198,7 +195,6 @@ function main() {
     };
 
     function removeCube(x, y, z) {
-      console.log("Remove X: " + x + " Y: " + y  + " Z: " + z )
       if (matrixHasElement[x][y][z]){
         matrixHasElement[x][y][z] = true;
       } else {
@@ -207,8 +203,17 @@ function main() {
     }
 
     function paintWall(x, y, z) {
-      console.log("Paint X: " + x + " Y: " + y  + " Z: " + z )
-      
+      console.log("Paint X: " + x + " Y: " + y  + " Z: " + z );
+
+      let xyChild = walls[`(${x},${y},-1)`].children;
+      xyChild[0].material.color.setHex( 0x0000ff );
+      xyChild[1].material.color.setHex( 0x0000ff );
+      let xzChild = walls[`(${x},-1,${z})`].children;
+      xzChild[0].material.color.setHex( 0x0000ff );
+      xzChild[1].material.color.setHex( 0x0000ff );
+      let yzChild = walls[`(-1,${y},${z})`].children;
+      yzChild[0].material.color.setHex( 0x0000ff );
+      yzChild[1].material.color.setHex( 0x0000ff );
     }
 
     function onDocumentMouseDown( event ) {  
@@ -220,8 +225,22 @@ function main() {
         let raycaster =  new THREE.Raycaster();                                        
         raycaster.setFromCamera( mouse3D, camera );
         let intersects = raycaster.intersectObjects( cubes );
+
+        function removeItemOnce(arr, value) {
+          var index = arr.indexOf(value);
+          if (index > -1) {
+            arr.splice(index, 1);
+          }
+          return arr;
+        }
       
         if ( intersects.length > 0 ) {
+          let res = intersects[ 0 ].object.name.split(",");
+          removeCube(parseInt(res[0]), parseInt(res[1]), parseInt(res[2]));
+          paintWall(parseInt(res[0]), parseInt(res[1]), parseInt(res[2]))
+          cubes.splice(cubes.indexOf(intersects[ 0 ].object), 1);
+          scene.remove( intersects[ 0 ].object);
+          /*
           let hit = false;
           let i = 0;
           while (hit == false && i < intersects.length){
@@ -235,6 +254,7 @@ function main() {
             }
             ++i;
           }
+          */
         }
         /*
         let movingIntersection = raycaster.intersectObjects( movingCubes );
