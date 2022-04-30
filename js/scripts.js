@@ -1,33 +1,32 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.136.0/build/three.module.js';
 import {OrbitControls} from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/OrbitControls.js';
+import {DragControls} from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/DragControls.js';
 
 function main() {
     const canvas = document.querySelector('#c');
-    document.addEventListener( 'mousedown', onDocumentMouseDown );
+    document.addEventListener('wheel', wheelMove);
     document.addEventListener('keydown', keyDown);
     document.addEventListener('keyup', keyUp);
     const renderer = new THREE.WebGLRenderer({ canvas });
     
-    const objects = [];
-
     const fov = 40;
     const aspect = 2;  // the canvas default
     const near = 0.1;
     const far = 1000;
     const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
     const cubeSize = 8;
-    let matrixBase = [];
-    let matrixHasElement = [];
     let cubes = [];
+    let grid = [];
     let walls = {};
-    let negativeState = false;
+    let dragging = false;
+    let controls, controlsDrag;
     let roundedBoxGeometry = createBoxWithRoundedEdges(0.95, 0.95, 0.95, .15, 2);
 
     camera.position.set(cubeSize*2, cubeSize*2, cubeSize*2);
     //camera.up.set(0, 0, 1);
     camera.lookAt(cubeSize/2, cubeSize/2, cubeSize/2);
     
-    const controls = new OrbitControls(camera, canvas);
+    controls = new OrbitControls(camera, canvas);
     controls.target.set(cubeSize/2, cubeSize/2, cubeSize/2);
     controls.mouseButtons = {
       RIGHT: THREE.MOUSE.ROTATE,
@@ -35,8 +34,8 @@ function main() {
       LEFT: THREE.MOUSE.PAN
     }
     controls.enablePan = false;
+    controls.enableZoom = false;
     controls.update();
-
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x5F5F5F);
@@ -52,8 +51,16 @@ function main() {
       scene.add(light);
     }
 
+    createGrid();
     createCubes();
     defineWalls();
+
+    
+    controlsDrag = new DragControls( cubes, camera, renderer.domElement );
+    controlsDrag.addEventListener( 'dragstart', dragStart);
+    controlsDrag.addEventListener( 'dragend', dragEnd);
+    controlsDrag.addEventListener( 'drag', drag);
+    
 
     function addObject(x, y, z, rx, ry, rz, geometry, material) {
         var obj = new THREE.Mesh(geometry, material);
@@ -148,30 +155,41 @@ function main() {
       return Math.floor(x/cubeSize*0xff)*0x010000 + Math.floor(y/cubeSize*0xff)*0x000100 + Math.floor(z/cubeSize*0xff)
     };
 
-    function createCubes() {
+    function createGrid() {
       for(let x=0; x < cubeSize; x++) {
-        matrixBase[x] = [];
-        matrixHasElement[x] = [];
+        grid[x] = [];
     
           for(let y=0; y < cubeSize; y++) {
-              matrixBase[x][y] = [];
-              matrixHasElement[x][y] = [];
+            grid[x][y] = [];
               for(let z=0; z < cubeSize; z++) {
                     let cube = addObject(x, y, z, 0, 0, 0, 
                       roundedBoxGeometry, 
-                      new THREE.MeshPhongMaterial( { color:  createColor(x, y, z)} )
+                      new THREE.MeshPhongMaterial( { color: 0xaaaaaa, transparent: true, opacity: 0.2} )
                     );
-                    cube.name = `${x},${y},${z}`;
-    
-                    matrixBase[x][y][z] = cube;
-                    matrixHasElement[x][y][z] = true;
-                    cubes.push(cube);
+                    let dict = {
+                      "state": "empty",
+                      "cube": cube
+                    };
+                    grid[x][y][z] = dict;
                     scene.add(cube);
               }
           }
       }
       
     };
+
+    function createCubes() {
+
+      for(let x = 0; x < 3; x++) {
+        let cube = addObject(cubeSize + 2 + x, 0, 0, 0, 0, 0, 
+          roundedBoxGeometry, 
+          new THREE.MeshPhongMaterial( { color: 0x00ff00} )
+        );
+        cubes[x] = cube;
+        scene.add(cube);
+      } 
+     
+    }
 
     function createBoxWithRoundedEdges( width, height, depth, radius0, smoothness ) {
       let shape = new THREE.Shape();
@@ -194,11 +212,14 @@ function main() {
       return geometry;
     };
 
-    function removeCube(x, y, z) {
-      if (matrixHasElement[x][y][z]){
-        matrixHasElement[x][y][z] = true;
-      } else {
-        matrixHasElement[x][y][z] = false;
+    function changeStateGrid(x, y, z, state) {
+      if (state == "ghost" && grid[x][y][z]["state"] != "ghost" && grid[x][y][z]["state"] != "full"){ //ghost state
+        grid[x][y][z]["cube"].material.color.setHex( 0x0000ff );
+        grid[x][y][z]["cube"].material.opacity = 1.0;
+      } else if (state = "fill" && grid[x][y][z]["state"] != "fill") { //fill state
+
+      } else if (grid[x][y][z]["state"] != "empty"){ //empty state
+
       }
     }
 
@@ -216,85 +237,46 @@ function main() {
       yzChild[1].material.color.setHex( 0x0000ff );
     }
 
-    function onDocumentMouseDown( event ) {  
-      if (event.which == 1){
-        event.preventDefault();
-        let mouse3D = new THREE.Vector3( ( event.clientX / window.innerWidth ) * 2 - 1,   
-                                -( event.clientY / window.innerHeight ) * 2 + 1,  
-                                0.5 );     
-        let raycaster =  new THREE.Raycaster();                                        
-        raycaster.setFromCamera( mouse3D, camera );
-        let intersects = raycaster.intersectObjects( cubes );
-
-        function removeItemOnce(arr, value) {
-          var index = arr.indexOf(value);
-          if (index > -1) {
-            arr.splice(index, 1);
-          }
-          return arr;
-        }
-      
-        if ( intersects.length > 0 ) {
-          let res = intersects[ 0 ].object.name.split(",");
-          removeCube(parseInt(res[0]), parseInt(res[1]), parseInt(res[2]));
-          paintWall(parseInt(res[0]), parseInt(res[1]), parseInt(res[2]))
-          cubes.splice(cubes.indexOf(intersects[ 0 ].object), 1);
-          scene.remove( intersects[ 0 ].object);
-          /*
-          let hit = false;
-          let i = 0;
-          while (hit == false && i < intersects.length){
-            if (intersects[ i ].object.material.transparent == false){
-              hit = true;
-              intersects[ i ].object.material.transparent = true;
-              intersects[ i ].object.material.opacity = 0
-              let res = intersects[ 0 ].object.name.split(",");
-              removeCube(parseInt(res[0]), parseInt(res[1]), parseInt(res[2]));
-              paintWall(parseInt(res[0]), parseInt(res[1]), parseInt(res[2]))
-            }
-            ++i;
-          }
-          */
-        }
-        /*
-        let movingIntersection = raycaster.intersectObjects( movingCubes );
-        if ( movingIntersection.length > 0 ) {
-          movingIntersection[0].object.material.color.setHex( 0xffffff )
-          cubeSelected = true;
-          x = event.pageX;
-          y = event.pageY;
-          console.log("X: " + x + " Y: " + y);
-        }
-        */
+    function wheelMove(event) {
+      if (dragging){
+        console.log(event.deltaY);
       }
     }
 
     function keyDown(event) {
-      if (!negativeState && event.shiftKey){
-        negativeState = true;
-        invertCubes();
+      if (event.shiftKey){
+
       }
     }
     
     function keyUp(event) {
-      if (event.keyCode == 16 && negativeState) { //Shift
-        negativeState = false;
-        invertCubes();
+      if (event.keyCode == 16) { //Shift
+
       }
     }
-    
-    function invertCubes (){
-      let i = 0;
-      while (i < cubes.length){
-        if (cubes[i].material.transparent == true){
-          cubes[i].material.transparent = false;
-          cubes[i].material.opacity = 1;
-        } else {
-          cubes[i].material.transparent = true;
-          cubes[i].material.opacity = 0;
-        }
-        ++i;
-      }   
+
+    function dragStart( event ) {
+      event.object.material.emissive.set( 0xaaaaaa );
+      dragging = false;
+    }
+
+    function dragEnd( event ) {
+      event.object.material.emissive.set( 0x000000 );
+      dragging = true;
+    }
+
+    function drag( event ) {
+      let pos = event.object.position;
+      let x = (pos.x).toFixed();
+      let y = (pos.y).toFixed();
+      let z = (pos.z).toFixed();
+      if (x >= 0 && x < cubeSize
+        && y >= 0 && y < cubeSize
+        && z >= 0 && z < cubeSize){
+        console.log("x: " + x + " y: " + y + " z: " + z);
+        changeStateGrid(Math.abs(x), Math.abs(y), Math.abs(z), "ghost");
+      }
+      
     }
 }
 
