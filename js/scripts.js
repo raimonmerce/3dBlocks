@@ -71,12 +71,10 @@ function main() {
     createCubes();
     defineWalls();
 
-    
     controlsDrag = new DragControls( cubes, camera, renderer.domElement );
     controlsDrag.addEventListener( 'dragstart', dragStart);
     controlsDrag.addEventListener( 'dragend', dragEnd);
     controlsDrag.addEventListener( 'drag', drag);
-    
 
     function addObject(x, y, z, rx, ry, rz, geometry, material) {
         var obj = new THREE.Mesh(geometry, material);
@@ -207,8 +205,8 @@ function main() {
     };
 
     function createCubes() {
-      for(let x = 0; x < 3; x++) {
-        let cube = addObject(cubeSize + 2 + x, 0, 0, 0, 0, 0, 
+      for(let x = 0; x < cubeSize; x++) {
+        let cube = addObject(cubeSize + 1, 0, x, 0, 0, 0, 
           roundedBoxGeometry, 
           new THREE.MeshPhongMaterial( { color: 0x00ff00} )
         );
@@ -241,17 +239,20 @@ function main() {
 
     function changeStateGrid(x, y, z, state) {
       if (state == "ghost" && grid[x][y][z]["state"] == "empty"){ //ghost state
+        console.log("A");
         grid[x][y][z]["cube"].material.color.setHex( colorGridGhost );
         grid[x][y][z]["cube"].material.opacity = 0.8;
         grid[x][y][z]["state"] = "ghost";
         paintWall(x, y, z, true);
       } else if (state == "fill" && grid[x][y][z]["state"] != "fill") { //fill state
+        console.log("B");
         grid[x][y][z]["cube"].material.color.setHex( colorGridFull );
         grid[x][y][z]["cube"].material.opacity = 1.0;
         grid[x][y][z]["state"] = "fill";
-        addDeep(x, y, z, true);
+        addDeep(x, y, z);
         paintWall(x, y, z, false);
-      } else if (grid[x][y][z]["state"] != "empty"){ //empty state
+      } else if (state == "empty" && grid[x][y][z]["state"] == "ghost"){ //empty state
+        console.log("C");
         grid[x][y][z]["cube"].material.color.setHex( colorGridEmpty );
         grid[x][y][z]["cube"].material.opacity = 0.1;
         grid[x][y][z]["state"] = "empty";
@@ -259,10 +260,42 @@ function main() {
       }
     }
 
-    function addDeep(x, y, z, mode){
-      walls[`(${x},${y},-1)`]["deep"]++;
-      walls[`(${x},-1,${z})`]["deep"]++;
-      walls[`(-1,${y},${z})`]["deep"]++;
+    function addDeep(x, y, z){
+      let xyVal = walls[`(${x},${y},-1)`]["deep"]++;
+      let xzVal = walls[`(${x},-1,${z})`]["deep"]++;
+      let yzVal = walls[`(-1,${y},${z})`]["deep"]++;
+      if (xyVal == cubeSize){
+        for(let i = 0; i < cubeSize; i++) {
+          grid[x][y][i]["cube"].material.color.setHex( colorGridEmpty );
+          grid[x][y][i]["cube"].material.opacity = 0.1;
+          grid[x][y][i]["state"] = "empty";
+          remDeep(x, y, i);
+        }
+      }
+
+      if (xzVal == cubeSize){
+        for(let i = 0; i < cubeSize; i++) {
+          grid[x][y][i]["cube"].material.color.setHex( colorGridEmpty );
+          grid[x][y][i]["cube"].material.opacity = 0.1;
+          grid[x][y][i]["state"] = "empty";
+          remDeep(x, i, z);
+        }
+      }
+
+      if (yzVal == cubeSize){
+        for(let i = 0; i < cubeSize; i++) {
+          grid[x][y][i]["cube"].material.color.setHex( colorGridEmpty );
+          grid[x][y][i]["cube"].material.opacity = 0.1;
+          grid[x][y][i]["state"] = "empty";
+          remDeep(i, y, z);
+        }
+      }
+    }
+
+    function remDeep(x, y, z){
+      if (walls[`(${x},${y},-1)`]["deep"] != 0) walls[`(${x},${y},-1)`]["deep"]--;
+      if (walls[`(${x},-1,${z})`]["deep"] != 0) walls[`(${x},-1,${z})`]["deep"]--;
+      if (walls[`(-1,${y},${z})`]["deep"] != 0) walls[`(-1,${y},${z})`]["deep"]--;
     }
 
     function paintWall(x, y, z, ghost) {
