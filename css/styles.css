@@ -9,3 +9,21 @@ body {
     height: 100%;
     display: block;
 }
+
+.header_thumbs_container{
+    height: auto; 
+    position: absolute;z-index:2;
+    top:20px;right:20px;
+    justify-content: right;
+    align-content: flex-start;
+    align-items: flex-start;
+    float: right;
+}
+.header_thumb{
+    width:100px;height:100px;
+    margin-top:10px;margin-bottom:10px;
+    border-radius:50%;
+    background-color:rgba(0,0,0,0.10);
+    border:2px solid #111;
+    overflow:hidden;
+}

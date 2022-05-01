@@ -15,13 +15,16 @@ function main() {
     const far = 1000;
     const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
     const cubeSize = 6;
+    const numObjects = 3;
     let draggedObject;
-    let cubes = [];
+    let draggedChildren = [];
+    let objects = [];
     let grid = [];
     let walls = {};
     let dragging = false;
     let controls, controlsDrag;
     let roundedBoxGeometry = createBoxWithRoundedEdges(0.95, 0.95, 0.95, .15, 2);
+    let lastPostions = [];
     let lastPos = {
       "x": -1,
       "y": -1,
@@ -68,13 +71,17 @@ function main() {
     }
 
     createGrid();
-    createCubes();
+    createObjects();
     defineWalls();
+    
+    for(let i = 0; i < numObjects; i++) {
+      controlsDrag = new DragControls( objects[i], camera, renderer.domElement );
+      controlsDrag.transformGroup = true;
+      controlsDrag.addEventListener( 'dragstart', dragStart);
+      controlsDrag.addEventListener( 'dragend', dragEnd);
+      controlsDrag.addEventListener( 'drag', drag);
+    }
 
-    controlsDrag = new DragControls( cubes, camera, renderer.domElement );
-    controlsDrag.addEventListener( 'dragstart', dragStart);
-    controlsDrag.addEventListener( 'dragend', dragEnd);
-    controlsDrag.addEventListener( 'drag', drag);
 
     function addObject(x, y, z, rx, ry, rz, geometry, material) {
         var obj = new THREE.Mesh(geometry, material);
@@ -174,10 +181,6 @@ function main() {
       }
     };
 
-    function createColor(x, y, z) {
-      return Math.floor(x/cubeSize*0xff)*0x010000 + Math.floor(y/cubeSize*0xff)*0x000100 + Math.floor(z/cubeSize*0xff)
-    };
-
     function generateWallColor(num){
       return 0xffffff - (num*0x222222);
     }
@@ -185,35 +188,40 @@ function main() {
     function createGrid() {
       for(let x=0; x < cubeSize; x++) {
         grid[x] = [];
-          for(let y=0; y < cubeSize; y++) {
-            grid[x][y] = [];
-              for(let z=0; z < cubeSize; z++) {
-                    let cube = addObject(x, y, z, 0, 0, 0, 
-                      roundedBoxGeometry, 
-                      new THREE.MeshPhongMaterial( { color: colorGridEmpty, transparent: true, opacity: 0.2} )
-                    );
-                    let dict = {
-                      "state": "empty",
-                      "cube": cube
-                    };
-                    grid[x][y][z] = dict;
-                    scene.add(cube);
-              }
+        for(let y=0; y < cubeSize; y++) {
+          grid[x][y] = [];
+          for(let z=0; z < cubeSize; z++) {
+            let cube = addObject(x, y, z, 0, 0, 0, 
+              roundedBoxGeometry, 
+              new THREE.MeshPhongMaterial( { color: colorGridEmpty, transparent: true, opacity: 0.2} )
+            );
+            let dict = {
+              "state": "empty",
+              "cube": cube
+            };
+            grid[x][y][z] = dict;
+            scene.add(cube);
           }
+        }
       }
-      
     };
 
-    function createCubes() {
-      for(let x = 0; x < cubeSize; x++) {
-        let cube = addObject(cubeSize + 1, 0, x, 0, 0, 0, 
-          roundedBoxGeometry, 
-          new THREE.MeshPhongMaterial( { color: 0x00ff00} )
-        );
-        cubes[x] = cube;
-        scene.add(cube);
+    function createObjects() {
+      for(let i = 0; i < 3; i++) {
+        let obj = new THREE.Object3D();
+        for(let j = 0; j < 2; j++) {
+          let cube = addObject(0, 0, j, 0, 0, 0, 
+            roundedBoxGeometry, 
+            new THREE.MeshPhongMaterial( { color: 0x00ff00} )
+          );
+          obj.add(cube);
+        }
+        obj.position.x = cubeSize + 1;
+        obj.position.z = i;
+        objects[i] = [];
+        objects[i][0] = obj;
+        scene.add(obj);
       } 
-     
     }
 
     function createBoxWithRoundedEdges( width, height, depth, radius0, smoothness ) {
@@ -238,21 +246,19 @@ function main() {
     };
 
     function changeStateGrid(x, y, z, state) {
+      console.log("x: " + x + " y: " + " z: " + z + " state: " + state);
       if (state == "ghost" && grid[x][y][z]["state"] == "empty"){ //ghost state
-        console.log("A");
         grid[x][y][z]["cube"].material.color.setHex( colorGridGhost );
         grid[x][y][z]["cube"].material.opacity = 0.8;
         grid[x][y][z]["state"] = "ghost";
         paintWall(x, y, z, true);
       } else if (state == "fill" && grid[x][y][z]["state"] != "fill") { //fill state
-        console.log("B");
         grid[x][y][z]["cube"].material.color.setHex( colorGridFull );
         grid[x][y][z]["cube"].material.opacity = 1.0;
         grid[x][y][z]["state"] = "fill";
         addDeep(x, y, z);
         paintWall(x, y, z, false);
       } else if (state == "empty" && grid[x][y][z]["state"] == "ghost"){ //empty state
-        console.log("C");
         grid[x][y][z]["cube"].material.color.setHex( colorGridEmpty );
         grid[x][y][z]["cube"].material.opacity = 0.1;
         grid[x][y][z]["state"] = "empty";
@@ -261,9 +267,12 @@ function main() {
     }
 
     function addDeep(x, y, z){
-      let xyVal = walls[`(${x},${y},-1)`]["deep"]++;
-      let xzVal = walls[`(${x},-1,${z})`]["deep"]++;
-      let yzVal = walls[`(-1,${y},${z})`]["deep"]++;
+      walls[`(${x},${y},-1)`]["deep"]++;
+      walls[`(${x},-1,${z})`]["deep"]++;
+      walls[`(-1,${y},${z})`]["deep"]++;
+      let xyVal = walls[`(${x},${y},-1)`]["deep"];
+      let xzVal = walls[`(${x},-1,${z})`]["deep"];
+      let yzVal = walls[`(-1,${y},${z})`]["deep"];
       if (xyVal == cubeSize){
         for(let i = 0; i < cubeSize; i++) {
           grid[x][y][i]["cube"].material.color.setHex( colorGridEmpty );
@@ -296,6 +305,7 @@ function main() {
       if (walls[`(${x},${y},-1)`]["deep"] != 0) walls[`(${x},${y},-1)`]["deep"]--;
       if (walls[`(${x},-1,${z})`]["deep"] != 0) walls[`(${x},-1,${z})`]["deep"]--;
       if (walls[`(-1,${y},${z})`]["deep"] != 0) walls[`(-1,${y},${z})`]["deep"]--;
+      paintWall(x, y, z, false);
     }
 
     function paintWall(x, y, z, ghost) {
@@ -329,6 +339,45 @@ function main() {
 
     }
 
+    function keyDown(event) {
+      if (event.shiftKey){
+
+      }
+    }
+    
+    function keyUp(event) {
+      if (event.keyCode == 16) { //Shift
+
+      }
+    }
+
+    function (){
+
+    }
+
+    function dragStart(event) {
+      draggedObject =  event.object;
+      dragging = true;
+      draggedChildren = draggedObject.children;
+      for (let i = 0; i < draggedChildren.length; i++){
+        draggedChildren[i].material.emissive.set( colorEmissive );
+      }
+    }
+
+    function drag(event) { 
+      let x = camera.position.x - draggedObject.position.x;
+      let y = camera.position.y - draggedObject.position.y;
+      let z = camera.position.z - draggedObject.position.z;
+      let total = Math.sqrt(x*x + y*y + z*z);
+      x /= total;
+      y /= total;
+      z /= total;
+      draggedObject.position.x += zoomDist * x;
+      draggedObject.position.y += zoomDist * y;
+      draggedObject.position.z += zoomDist * z;
+      moveGrag();
+    }
+
     function wheelMove(event) {
       if (dragging){
         zoomDist += event.deltaY/200;
@@ -345,31 +394,52 @@ function main() {
         draggedObject.position.y += event.deltaY/200 * y;
         draggedObject.position.z += event.deltaY/200 * z;
 
-        moveGrag(draggedObject);
+        moveGrag();
       }
     }
 
-    function keyDown(event) {
-      if (event.shiftKey){
-
+    function moveGrag(){
+      draggedChildren = draggedObject.children;
+      let pos = draggedObject.position;
+      console.log(draggedChildren.length);
+      
+      for (let i = 0; i < draggedChildren.length; i++){
+        let childPos = draggedChildren[i].position;
+        
+        let x = (pos.x + childPos.x).toFixed();
+        let y = (pos.y + childPos.y).toFixed();
+        let z = (pos.z + childPos.z).toFixed();
+        if (x >= 0 && x < cubeSize
+          && y >= 0 && y < cubeSize
+          && z >= 0 && z < cubeSize){
+          x = Math.abs(x);
+          y = Math.abs(y);
+          z = Math.abs(z);
+          
+          if (lastPos["x"] != x || lastPos["y"] != y || lastPos["z"] != z ){
+            if (lastPos["x"] != -1 && lastPos["y"] != -1 && lastPos["z"] != -1){
+              changeStateGrid(lastPos["x"], lastPos["y"], lastPos["z"], "empty");
+            }
+            changeStateGrid(x, y, z, "ghost");
+            lastPos["x"] = x;
+            lastPos["y"] = y;
+            lastPos["z"] = z; 
+          }
+        } else if (lastPos["x"] != -1 && lastPos["y"] != -1 && lastPos["z"] != -1){
+          changeStateGrid(lastPos["x"], lastPos["y"], lastPos["z"], "empty");
+          lastPos["x"] = -1;
+          lastPos["y"] = -1;
+          lastPos["z"] = -1; 
+        }
       }
-    }
-    
-    function keyUp(event) {
-      if (event.keyCode == 16) { //Shift
-
-      }
-    }
-
-    function dragStart(event) {
-      draggedObject =  event.object;
-      draggedObject.material.emissive.set( colorEmissive );
-      dragging = true;
     }
 
     function dragEnd() {
-      draggedObject.material.emissive.set( 0x000000 );
-      dragging = false;
+      draggedChildren = draggedObject.children;
+      for (let i = 0; i < draggedChildren.length; i++){
+        draggedChildren[i].material.emissive.set( 0x000000 ); //A
+      }
+      
       if(lastPos["x"] != -1 && lastPos["y"] != -1 && lastPos["z"] != -1){
         step();
         draggedObject.geometry.dispose();
@@ -382,58 +452,17 @@ function main() {
       }
       zoomDist = 0.0;
       draggedObject = false;
+      draggedObject = false;
       lastPos = {
         "x": -1,
         "y": -1,
         "z": -1
       };
-    }
-
-    function drag(event) {
-      let x = camera.position.x - event.object.position.x;
-      let y = camera.position.y - event.object.position.y;
-      let z = camera.position.z - event.object.position.z;
-      let total = Math.sqrt(x*x + y*y + z*z);
-      x /= total;
-      y /= total;
-      z /= total;
-      event.object.position.x += zoomDist * x;
-      event.object.position.y += zoomDist * y;
-      event.object.position.z += zoomDist * z;
-      moveGrag(event.object);
-    }
-
-    function moveGrag(object){
-      let pos = object.position;
-      let x = (pos.x).toFixed();
-      let y = (pos.y).toFixed();
-      let z = (pos.z).toFixed();
-      if (x >= 0 && x < cubeSize
-        && y >= 0 && y < cubeSize
-        && z >= 0 && z < cubeSize){
-        x = Math.abs(x);
-        y = Math.abs(y);
-        z = Math.abs(z);
-        
-        if (lastPos["x"] != x || lastPos["y"] != y || lastPos["z"] != z ){
-          if (lastPos["x"] != -1 && lastPos["y"] != -1 && lastPos["z"] != -1){
-            changeStateGrid(lastPos["x"], lastPos["y"], lastPos["z"], "empty");
-          }
-          changeStateGrid(x, y, z, "ghost");
-          lastPos["x"] = x;
-          lastPos["y"] = y;
-          lastPos["z"] = z; 
-        }
-      } else if (lastPos["x"] != -1 && lastPos["y"] != -1 && lastPos["z"] != -1){
-        changeStateGrid(lastPos["x"], lastPos["y"], lastPos["z"], "empty");
-        lastPos["x"] = -1;
-        lastPos["y"] = -1;
-        lastPos["z"] = -1; 
-      }
+      dragging = false;
     }
 
     function step(){
-      changeStateGrid(lastPos["x"], lastPos["y"], lastPos["z"], "fill");(lastPos["x"], lastPos["y"], lastPos["z"], "fill");
+      changeStateGrid(lastPos["x"], lastPos["y"], lastPos["z"], "fill");
     }
 }
 
