@@ -17,19 +17,25 @@ function main() {
     const cubeSize = 6;
     const numObjects = 3;
     let draggedObject;
-    let draggedChildren = [];
     let objects = [];
     let grid = [];
     let walls = {};
     let dragging = false;
     let controls, controlsDrag;
     let roundedBoxGeometry = createBoxWithRoundedEdges(0.95, 0.95, 0.95, .15, 2);
-    let lastPostions = [];
-    let lastPos = {
-      "x": -1,
-      "y": -1,
-      "z": -1
-    };
+    let lastPositions = [];
+    let objPos = [
+      ["000"], //.
+      ["000", "001"], //..
+      ["000", "001", "002"],//...
+      ["000", "001", "100"],//L
+      ["000", "001", "002", "003"],//
+      ["000", "001", "002", "100"],
+      ["000", "001", "010", "100"],
+      ["000", "001", "011", "012"],
+      ["000", "001", "011", "010"],
+      ["000", "001", "002", "100", "200"],
+  ];
 
     let colorPlaneEmpty = 0xffffff;
     let colorPlaneGhost = 0xFF7000;
@@ -207,10 +213,30 @@ function main() {
     };
 
     function createObjects() {
+      /*
+      for(let i = 0; i < 3; i++) {
+        let obj = new THREE.Object3D();
+        let positions =  objPos[Math.floor(Math.random() * objPos.length)];
+        for(let j = 0; j < positions.length; j++) {
+          //Rotate and get values
+          let cube = addObject(x, y, z, 0, 0, 0, 
+            roundedBoxGeometry, 
+            new THREE.MeshPhongMaterial( { color: 0x00ff00} )
+          );
+          obj.add(cube);
+        }
+        obj.position.x = cubeSize + 1;
+        obj.position.z = i;
+        objects[i] = [];
+        objects[i][0] = obj;
+        scene.add(obj);
+      } */
+      
+      
       for(let i = 0; i < 3; i++) {
         let obj = new THREE.Object3D();
         for(let j = 0; j < 2; j++) {
-          let cube = addObject(0, 0, j, 0, 0, 0, 
+          let cube = addObject(j, 0, 0, 0, 0, 0, 
             roundedBoxGeometry, 
             new THREE.MeshPhongMaterial( { color: 0x00ff00} )
           );
@@ -222,6 +248,7 @@ function main() {
         objects[i][0] = obj;
         scene.add(obj);
       } 
+      
     }
 
     function createBoxWithRoundedEdges( width, height, depth, radius0, smoothness ) {
@@ -308,6 +335,24 @@ function main() {
       paintWall(x, y, z, false);
     }
 
+    function inLastPos(x, y, z){
+
+      for (let i = 0; i < lastPositions.length; i++){
+        if (lastPositions[i][0] == x 
+        && lastPositions[i][0] == y 
+        && lastPositions[i][0] == z ) return i;
+      }
+      return -1;
+    }
+
+    function ghostFills(){
+      if (lastPositions.length != draggedObject.children.length) return false;
+      for (let i = 0; i < lastPositions.length; i++){
+        if (grid[lastPositions[i][0]][lastPositions[i][1]][lastPositions[i][2]]["state"] == "fill") return false;
+      }
+      return true;
+    }
+
     function paintWall(x, y, z, ghost) {
       let xyChild = walls[`(${x},${y},-1)`]["wall"].children;
       let xzChild = walls[`(${x},-1,${z})`]["wall"].children;
@@ -351,14 +396,10 @@ function main() {
       }
     }
 
-    function (){
-
-    }
-
     function dragStart(event) {
       draggedObject =  event.object;
       dragging = true;
-      draggedChildren = draggedObject.children;
+      let draggedChildren = draggedObject.children;
       for (let i = 0; i < draggedChildren.length; i++){
         draggedChildren[i].material.emissive.set( colorEmissive );
       }
@@ -399,13 +440,12 @@ function main() {
     }
 
     function moveGrag(){
-      draggedChildren = draggedObject.children;
+      let draggedChildren = draggedObject.children;
       let pos = draggedObject.position;
-      console.log(draggedChildren.length);
-      
+      let futureLastPos = [];
+      let newPos = [];
       for (let i = 0; i < draggedChildren.length; i++){
         let childPos = draggedChildren[i].position;
-        
         let x = (pos.x + childPos.x).toFixed();
         let y = (pos.y + childPos.y).toFixed();
         let z = (pos.z + childPos.z).toFixed();
@@ -415,49 +455,53 @@ function main() {
           x = Math.abs(x);
           y = Math.abs(y);
           z = Math.abs(z);
-          
-          if (lastPos["x"] != x || lastPos["y"] != y || lastPos["z"] != z ){
-            if (lastPos["x"] != -1 && lastPos["y"] != -1 && lastPos["z"] != -1){
-              changeStateGrid(lastPos["x"], lastPos["y"], lastPos["z"], "empty");
-            }
-            changeStateGrid(x, y, z, "ghost");
-            lastPos["x"] = x;
-            lastPos["y"] = y;
-            lastPos["z"] = z; 
+        
+          futureLastPos[i] = [x, y, z];
+          let ind = inLastPos(x, y, z);
+          if (ind != -1){
+            lastPositions.splice(ind, 1);
+          } else {
+            newPos.push([x, y, z]);
           }
-        } else if (lastPos["x"] != -1 && lastPos["y"] != -1 && lastPos["z"] != -1){
-          changeStateGrid(lastPos["x"], lastPos["y"], lastPos["z"], "empty");
-          lastPos["x"] = -1;
-          lastPos["y"] = -1;
-          lastPos["z"] = -1; 
         }
       }
+
+      for (let i = 0; i < lastPositions.length; i++){
+        changeStateGrid(lastPositions[i][0], lastPositions[i][1], lastPositions[i][2], "empty");
+      }
+
+      for (let i = 0; i < newPos.length; i++){
+        changeStateGrid(newPos[i][0], newPos[i][1], newPos[i][2], "ghost");
+      }
+
+      console.log("futureLastPos" + futureLastPos)
+      console.log("lastPositions" + lastPositions)
+      console.log("newPos" + newPos)
+      lastPositions = futureLastPos;
+      console.log("lastPositions" + lastPositions)
+      console.log("----")
     }
 
     function dragEnd() {
-      draggedChildren = draggedObject.children;
-      for (let i = 0; i < draggedChildren.length; i++){
-        draggedChildren[i].material.emissive.set( 0x000000 ); //A
+      let draggedChildren = draggedObject.children;
+      for (let i = 0;i < draggedChildren.length; ++i){
+        draggedChildren[i].material.emissive.set( 0x000000 );
       }
-      
-      if(lastPos["x"] != -1 && lastPos["y"] != -1 && lastPos["z"] != -1){
-        step();
-        draggedObject.geometry.dispose();
-        draggedObject.material.dispose();
-        scene.remove( draggedObject );
-        let index = cubes.indexOf(draggedObject);
-        if (index > -1) {
-          cubes.splice(index, 1); // 2nd parameter means remove one item only
+      if (ghostFills()){
+        console.log("fills")
+        for (let i = 0; i < lastPositions.length; i++){
+          changeStateGrid(lastPositions[i][0], lastPositions[i][1], lastPositions[i][2], "fill");
+        }
+        scene.remove( draggedObject );    
+      } else {
+        console.log("not fills")
+        for (let i = 0; i < lastPositions.length; i++){
+          changeStateGrid(lastPositions[i][0], lastPositions[i][1], lastPositions[i][2], "empty");
         }
       }
       zoomDist = 0.0;
       draggedObject = false;
-      draggedObject = false;
-      lastPos = {
-        "x": -1,
-        "y": -1,
-        "z": -1
-      };
+      lastPositions = [];
       dragging = false;
     }
 
