@@ -252,7 +252,7 @@ function defineWalls(){
       walls[`(${i},${j},-1)`] = dict;
       scene.add(xy);
 
-      //xy
+      //xz
       let xz = new THREE.Object3D();
       tmp = addObject(i, -cubeSize, j, -Math.PI / 2, 0, 0,
         new THREE.PlaneGeometry( 0.95, 0.95 ), 
