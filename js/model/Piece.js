@@ -70,19 +70,11 @@ export default class Piece extends ObjectBody {
         }
 
         let pos = [
-            config.cubeSize/2 - (posMm[0] + posMm[1])/2,
-            config.cubeSize/2 - (posMm[2] + posMm[3])/2,
-            config.cubeSize/2 - (posMm[4] + posMm[5])/2
+            config.cubeSize/2 - (posMm[0] + posMm[1])/2 - 0.5,
+            config.cubeSize/2 - (posMm[2] + posMm[3])/2 - 0.5,
+            config.cubeSize/2 - (posMm[4] + posMm[5])/2 - 0.5
         ]
 
         this.emit('SetPiecePosition', { pos });
-
-        /*
-        peace.position.set(
-          cubeSize/2 - (posMm[0] + posMm[1])/2,
-          cubeSize/2 - (posMm[2] + posMm[3])/2,
-          cubeSize/2 - (posMm[4] + posMm[5])/2
-        )
-        */
     }
 }

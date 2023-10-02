@@ -24,7 +24,7 @@ export default class PieceViewMediator extends ViewMediator {
         const container = new THREE.Mesh( geometry, material )
         */
         const container = new THREE.Object3D();
-        container.position.set(3, 3, 3);
+        //container.position.set(3, 3, 3);
         return container;
     }
     
