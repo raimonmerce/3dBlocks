@@ -11,4 +11,5 @@ export default class GameViewMediator extends ViewMediator {
     onScenarioCreated(e) {
         this.addChild(e.scenario);
     }
+
 }

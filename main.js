@@ -9,6 +9,7 @@ const game = new Game();
 const gameController = new GameController(game);
 
 game.createScenario();
+//game.createPieces();
 
 //Old code
 let work = false;

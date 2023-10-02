@@ -10,6 +10,9 @@ export default class Observable {
     }
 
     emit(label, e) {
+        //console.log("emit")
+        //console.log(e)
+        //console.log(this.observers)
         const observers = this.observers.get(label);
 
         if (observers && observers.length) {

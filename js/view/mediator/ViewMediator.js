@@ -7,7 +7,7 @@ export default class ViewMediator extends Observable {
         this.object = object;
         this.mediatorFactory = mediatorFactory;
         this.object3D = this.makeObject3D();
-        this.object3D.name = object.name;
+        //this.object3D.name = object.name;
         this.childMediators = new Map();
         this.object3D.traverse((object3D) => {
             object3D.mediator = this;
